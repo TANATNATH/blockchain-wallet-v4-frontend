@@ -1,126 +1,64 @@
-import {
-  curry,
-  filter,
-  keys,
-  lensProp,
-  map,
-  mapObjIndexed,
-  path,
-  prop,
-  propOr,
-  set,
-  toUpper
-} from 'ramda'
+import { path, prop } from 'ramda'
 
-import { CoinType, RemoteDataType } from 'core/types'
+import { Remote } from 'blockchain-wallet-v4/src'
+import { /* AccountTokensBalancesResponseType, */ RemoteDataType } from 'core/types'
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { RootState } from 'data/rootReducer'
 
-import { createDeepEqualSelector } from '../../utils'
-import { getInvitations } from '../settings/selectors'
-import {
-  SupportedCoinType,
-  SupportedWalletCurrenciesType,
-  SupportedWalletCurrencyType,
-  WalletOptionsType
-} from './types'
+import { WalletOptionsType } from './types'
 
 // general
 export const getOptions = (state: RootState) =>
   state.walletOptionsPath as RemoteDataType<string, WalletOptionsType>
-export const getDomains = state => getOptions(state).map(x => x.domains)
-export const getWebOptions = state =>
+export const getDomains = (state) => getOptions(state).map((x) => x.domains)
+export const getWebOptions = (state) =>
   getOptions(state).map(path(['platforms', 'web'])) as RemoteDataType<
     string,
     WalletOptionsType['platforms']['web']
   >
-export const getWalletHelperUrl = state =>
-  getDomains(state).map(prop('walletHelper'))
-export const getAppEnv = state =>
-  getWebOptions(state).map(path(['application', 'environment']))
-export const getAnalyticsSiteId = state =>
+export const getWalletHelperUrl = (state) => getDomains(state).map(prop('walletHelper'))
+export const getAppEnv = (state) => getWebOptions(state).map(path(['application', 'environment']))
+export const getAnalyticsSiteId = (state) =>
   getWebOptions(state).map(path(['application', 'analyticsSiteId']))
-export const getAnnouncements = state =>
+export const getAnnouncements = (state) =>
   getWebOptions(state).map(path(['application', 'announcements']))
+export const getNewCoinListing = (state: RootState) =>
+  getOptions(state).map((options) => options.platforms.web.coinListing)
 
-// coins
-// @ts-ignore
-export const getSupportedCoins = createDeepEqualSelector(
-  [getInvitations, getWebOptions],
-  (invitationsR, webOptionsR) => {
-    const addInvited = (obj, coin) => {
-      // @ts-ignore
-      const invited = invitationsR.map(propOr(true, coin)).getOrElse(false)
-      return set(lensProp('invited'), invited, obj)
-    }
-    // @ts-ignore
-    return webOptionsR.map(prop('coins')).map(mapObjIndexed(addInvited))
-  }
-) as (state: RootState) => RemoteDataType<string, SupportedWalletCurrenciesType>
-export const getSyncToExchangeList = state =>
-  getSupportedCoins(state)
-    .map(
-      filter(
-        (value: SupportedWalletCurrencyType) =>
-          // @ts-ignore
-          value.availability.syncToPit
-      )
-    )
-    .map(keys)
-export const getBtcNetwork = state =>
-  getSupportedCoins(state).map(path(['BTC', 'config', 'network']))
-export const getEthTxFuse = state =>
-  getSupportedCoins(state).map(path(['ETH', 'lastTxFuse']))
-export const getXlmSendTimeOutSeconds = state =>
-  getSupportedCoins(state).map(path(['XLM', 'config', 'sendTimeOutSeconds']))
-export const getXlmExchangeAddresses = state =>
-  getSupportedCoins(state).map(path(['XLM', 'exchangeAddresses']))
-export const getStxCampaign = state =>
-  getWebOptions(state).map(path(['coins', 'STX', 'campaign']))
+export const getXlmSendTimeOutSeconds = () => Remote.of(600)
+export const getXlmExchangeAddresses = () => Remote.of([])
 
-// coin feature availability
-export const getCoinAvailability = curry((state, coin) =>
-  getSupportedCoins(state).map(path([toUpper(coin), 'availability']))
-)
-export const getAllCoinAvailabilities = state => {
-  return map(
-    map(prop('availability')),
-    getSupportedCoins(state)
-  ) as RemoteDataType<
-    any,
-    {
-      [key in CoinType]: {
-        [key in keyof SupportedCoinType['availability']]: boolean
-      }
-    }
-  >
-}
+// 3rd Party
+export const getVeriffDomain = (state) => getDomains(state).map(prop('veriff'))
+export const getSiftKey = (state) => getWebOptions(state).map(path(['sift', 'apiKey']))
 
-export const getErc20CoinList = state =>
-  getSupportedCoins(state).map(x =>
-    // @ts-ignore
-    keys(filter((c: SupportedCoinType) => !!c.contractAddress, x))
-  )
-export const getCoinModel = (state, coin) =>
-  // @ts-ignore
-  getSupportedCoins(state).map(x => prop(toUpper(coin), x))
-export const getCoinIcons = (state, coin) =>
-  // @ts-ignore
-  getCoinModel(state, coin).map(path(['icons']))
+//
+// FEATURE FLAG SELECTORS
+//
 
-// domains
-export const getVeriffDomain = state => getDomains(state).map(prop('veriff'))
+// show pairing code flag on staging
+export const getPairingCodeFlag = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'legacyMobilePairing']))
 
-// partners
-export const getSiftKey = state =>
-  getWebOptions(state).map(path(['sift', 'apiKey']))
-export const getSiftPaymentKey = (state: RootState) => {
-  return getWebOptions(state).map(options => options.sift.paymentKey)
-}
+// recurring buys flag
+export const getFeatureFlagRecurringBuys = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'recurringBuys']))
 
-// mobile auth flag
-export const getMobileAuthFlag = state =>
-  getWebOptions(state).map(path(['mobile_auth', 'enabled']))
+// legacy recovery flag
+export const getFeatureLegacyWalletRecovery = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'legacyWalletRecovery']))
 
-// brokerage deposits withdrawals flag
-export const getBrokerageDepositsWithdrawals = state =>
-  getWebOptions(state).map(path(['brokerage_deposits_withdrawals', 'enabled']))
+// legacy magic email link
+export const getFeatureLegacyMagicEmailLink = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'legacyMagicEmailLink']))
+
+// signup country feature flag
+export const getFeatureSignupCountry = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'signupCountry']))
+
+// signup country feature flag
+export const getEDDInterestFileUpload = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'eddInterestFileUpload']))
+
+export const getSsoDummy = (state: RootState) =>
+  getWebOptions(state).map(path(['featureFlags', 'ssoDummy']))

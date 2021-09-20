@@ -1,3 +1,4 @@
+/* eslint-disable import/no-extraneous-dependencies */
 import BigNumber from 'bignumber.js'
 import EthereumAbi from 'ethereumjs-abi'
 import EthUtil from 'ethereumjs-util'
@@ -9,11 +10,11 @@ import { Exchange } from 'blockchain-wallet-v4/src'
 import { APIType } from 'blockchain-wallet-v4/src/network/api'
 import { ADDRESS_TYPES } from 'blockchain-wallet-v4/src/redux/payment/btc/utils'
 import { EthAccountFromType } from 'blockchain-wallet-v4/src/redux/payment/eth/types'
-import { Erc20CoinType, Erc20ListEnum, EthPaymentType } from 'blockchain-wallet-v4/src/types'
+import { Erc20CoinType, EthPaymentType } from 'blockchain-wallet-v4/src/types'
 import { errorHandler } from 'blockchain-wallet-v4/src/utils'
 import { calculateFee } from 'blockchain-wallet-v4/src/utils/eth'
 import { actions, actionTypes, model, selectors } from 'data'
-import { ModalNamesType } from 'data/modals/types'
+import { ModalNameType } from 'data/modals/types'
 import * as C from 'services/alerts'
 import * as Lockbox from 'services/lockbox'
 import { promptForSecondPassword } from 'services/sagas'
@@ -32,9 +33,10 @@ import {
   SendEthFormToActionType
 } from './types'
 
+const ETH = 'ETH'
 const { TRANSACTION_EVENTS } = model.analytics
-
 export const logLocation = 'components/sendEth/sagas'
+
 export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; networks }) => {
   const { showWithdrawalLockAlert } = sendSagas({
     api,
@@ -43,9 +45,9 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
   })
   const initialized = function* (action) {
     try {
-      const erc20List = (yield select(selectors.core.walletOptions.getErc20CoinList)).getOrFail()
-      const coin = propOr('ETH', 'payload', action)
-      const isErc20 = includes(coin, erc20List)
+      const coin: string = propOr(ETH, 'payload', action)
+      const { coinfig } = window.coins[coin]
+      const isErc20 = coinfig.type.erc20Address
       let initialValues = {}
       yield put(A.sendEthPaymentUpdatedLoading())
       yield put(actions.components.send.fetchPaymentsAccountExchange(coin))
@@ -104,9 +106,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
       const { form } = action.meta
       if (!equals(FORM, form)) return
       const { payload } = action
-      const erc20List = (yield select(selectors.core.walletOptions.getErc20CoinList)).getOrElse([])
       const { coin } = yield select(selectors.form.getFormValues(FORM))
-      const isErc20 = includes(coin, erc20List)
       const p = yield select(S.getPayment)
       let payment: EthPaymentType = coreSagas.payment.eth.create({
         network: networks.eth,
@@ -114,17 +114,6 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
       })
 
       switch (action.meta.field) {
-        // @ts-ignore
-        case 'coin':
-          const modalName = isErc20 ? 'ETH' : payload
-          yield put(actions.modals.closeAllModals())
-          yield put(
-            actions.modals.showModal(`SEND_${modalName}_MODAL` as ModalNamesType, {
-              coin: payload,
-              origin: 'SendEth'
-            })
-          )
-          break
         case 'from':
           const fromPayload = payload as SendEthFormFromActionType['payload']
           let source
@@ -151,15 +140,16 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
               yield put(A.sendEthPaymentUpdatedSuccess(payment.value()))
               yield put(change(FORM, 'to', null))
               break
+            default:
           }
           break
         case 'to':
           const toPayload = payload as SendEthFormToActionType['payload']
           const value = pathOr(toPayload, ['value', 'value'], toPayload)
-          if (includes('.', (value as unknown) as string)) {
+          if (includes('.', value as unknown as string)) {
             yield put(
               actions.components.send.fetchUnstoppableDomainResults(
-                (value as unknown) as string,
+                value as unknown as string,
                 coin
               )
             )
@@ -186,7 +176,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
             baseToStandard: false,
             coin: coinCode,
             value: amountPayload.coin
-          }).value
+          })
           payment = yield payment.amount(weiAmount)
           break
         case 'description':
@@ -199,6 +189,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
           // @ts-ignore
           payment = yield payment.fee(feePayload, account)
           break
+        default:
       }
 
       yield put(A.sendEthPaymentUpdatedSuccess(payment.value()))
@@ -214,29 +205,21 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
       const currency = selectors.core.settings
         .getCurrency(appState)
         .getOrFail('Failed to get currency')
-      let rates
-      let fiat
-      if (equals(coinCode, 'ETH')) {
-        rates = selectors.core.data.eth.getRates(appState).getOrFail('Failed to get ETH rates')
-      } else {
-        rates = (yield select(selectors.core.data.eth.getErc20Rates, toLower(coinCode))).getOrFail(
-          `Failed to get ${coinCode} rates`
-        )
-      }
+      const rates = selectors.core.data.coins
+        .getRates(coinCode, appState)
+        .getOrFail(`Failed to get ${coinCode} rates`)
       const payment = (yield select(S.getPayment)).getOrElse({})
       const effectiveBalance = prop('effectiveBalance', payment)
       const coin = Exchange.convertCoinToCoin({
-        baseToStandard: true,
         coin: coinCode,
         value: effectiveBalance
-      }).value
-      fiat = Exchange.convertCoinUnitToFiat({
+      })
+      const fiat = Exchange.convertCoinToFiat({
         coin: coinCode,
-        fromUnit: 'WEI',
+        currency,
         rates,
-        toCurrency: currency,
         value: effectiveBalance
-      }).value
+      })
       yield put(change(FORM, 'amount', { coin, coinCode, fiat }))
     } catch (e) {
       yield put(actions.logs.logErrorMessage(logLocation, 'maximumAmountClicked', e))
@@ -245,7 +228,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
 
   const secondStepSubmitClicked = function* () {
     const { coin } = yield select(selectors.form.getFormValues(FORM))
-    const coinModel = (yield select(selectors.core.walletOptions.getCoinModel, coin)).getOrFail()
+    const { coinfig } = window.coins[coin]
     yield put(startSubmit(FORM))
     const p = yield select(S.getPayment)
     let payment: EthPaymentType = coreSagas.payment.eth.create({
@@ -271,10 +254,10 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
           fromAddress
         )).getOrFail('missing_device')
         const deviceType = prop('device_type', device)
-        yield call(Lockbox.promptForLockbox, 'ETH', deviceType, [toAddress])
+        yield call(Lockbox.promptForLockbox, ETH, deviceType, [toAddress])
         const connection = yield select(selectors.components.lockbox.getCurrentConnection)
         const transport = prop('transport', connection)
-        const scrambleKey = Lockbox.utils.getScrambleKey('ETH', deviceType)
+        const scrambleKey = Lockbox.utils.getScrambleKey(ETH, deviceType)
         // @ts-ignore
         payment = yield payment.sign(null, transport, scrambleKey)
       }
@@ -312,7 +295,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
         if (fromType !== ADDRESS_TYPES.LOCKBOX) {
           yield take(actionTypes.core.kvStore.eth.FETCH_METADATA_ETH_SUCCESS)
         }
-        if (coinModel.contractAddress) {
+        if (coinfig.type.erc20Address) {
           yield put(
             actions.core.kvStore.eth.setTxNotesErc20(
               coin,
@@ -320,14 +303,10 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
               payment.value().description
             )
           )
-        } else {
-          yield put(
-            actions.core.kvStore.eth.setTxNotesEth(
-              payment.value().txId,
-              payment.value().description
-            )
-          )
         }
+        yield put(
+          actions.core.kvStore.eth.setTxNotesEth(payment.value().txId, payment.value().description)
+        )
       }
       // Display success
       if (fromType === ADDRESS_TYPES.LOCKBOX) {
@@ -340,32 +319,31 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
         const deviceIndex = prop('device_index', device)
         yield put(actions.router.push(`/lockbox/dashboard/${deviceIndex}`))
       } else {
-        yield put(actions.router.push(coinModel.txListAppRoute))
-        if (coin === 'ETH') {
+        yield put(actions.router.push(`/${coin}/transactions`))
+        if (coin === ETH) {
           yield put(actions.core.data.eth.fetchTransactions(null, true))
         } else {
-          yield put(actions.core.data.eth.fetchErc20Transactions(toLower(coin), true))
+          yield put(actions.core.data.eth.fetchErc20Transactions(coin, true))
         }
         yield put(
           actions.alerts.displaySuccess(
             isRetryAttempt ? C.RESEND_COIN_SUCCESS : C.SEND_COIN_SUCCESS,
             {
-              coinName: coinModel.displayName
+              coinName: coinfig.name
             }
           )
         )
       }
-      yield put(
-        actions.analytics.logEvent([
-          ...TRANSACTION_EVENTS.SEND,
-          coin,
-          Exchange.convertCoinToCoin({
-            baseToStandard: true,
-            coin,
-            value: payment.value().amount || 0
-          }).value
-        ])
-      )
+      const coinAmount = Exchange.convertCoinToCoin({
+        coin,
+        value: payment.value().amount || 0
+      })
+      yield put(actions.analytics.logEvent([...TRANSACTION_EVENTS.SEND, coin, coinAmount]))
+      // triggers email notification to user that
+      // non-custodial funds were sent from the wallet
+      if (fromType === ADDRESS_TYPES.ACCOUNT) {
+        yield put(actions.core.wallet.triggerNonCustodialSendAlert(coin, coinAmount))
+      }
       yield put(destroy(FORM))
       yield put(actions.modals.closeAllModals())
     } catch (e) {
@@ -381,7 +359,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
           actions.analytics.logEvent([
             ...TRANSACTION_EVENTS.SEND_FAILURE,
             coin,
-            coinModel.contractAddress && lowEthBalance ? 'Potentially insufficient ETH for TX' : e
+            coinfig.type.erc20Address && lowEthBalance ? 'Potentially insufficient ETH for TX' : e
           ])
         )
         if (fromType === ADDRESS_TYPES.CUSTODIAL && error) {
@@ -393,7 +371,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
         } else {
           yield put(
             actions.alerts.displayError(C.SEND_COIN_ERROR, {
-              coinName: coinModel.displayName
+              coinName: coinfig.name
             })
           )
         }
@@ -475,26 +453,14 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
     const currency = selectors.core.settings
       .getCurrency(yield select())
       .getOrFail('Failed to get currency')
-    let rates
-    if (equals(coin, 'ETH')) {
-      rates = selectors.core.data.eth.getRates(yield select()).getOrFail('Failed to get ETH rates')
-    } else {
-      rates = (yield select(selectors.core.data.eth.getErc20Rates, toLower(coin))).getOrFail(
-        `Failed to get ${coin} rates`
-      )
-    }
+    const rates = selectors.core.data.coins
+      .getRates(coin, yield select())
+      .getOrFail(`Failed to get ${coin} rates`)
     const cryptoAmt = Exchange.convertCoinToCoin({
-      baseToStandard: true,
       coin,
       value: amountInWei
-    }).value
-    const fiatAmt = Exchange.convertCoinUnitToFiat({
-      coin,
-      fromUnit: 'WEI',
-      rates,
-      toCurrency: currency,
-      value: amountInWei
-    }).value
+    })
+    const fiatAmt = Exchange.convertCoinToFiat({ coin, currency, rates, value: amountInWei })
     yield put(
       change(FORM, 'amount', {
         coin: cryptoAmt,
@@ -527,9 +493,12 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
         yield put(actions.core.data.eth.fetchTransactions())
         return
       }
-      let coin: 'ETH' | Erc20CoinType = 'ETH'
+      let coin = ETH
       if (isErc20) {
-        coin = Erc20ListEnum[tx.to]
+        coin =
+          Object.keys(window.coins).find(
+            (c: string) => tx.to === window.coins[c].coinfig.type.erc20Address
+          ) || ETH
       }
 
       yield put(
@@ -546,7 +515,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
         payment: p.getOrElse({})
       })
       if (!isErc20) {
-        payment = yield call(setAmount, tx.value, 'ETH', payment)
+        payment = yield call(setAmount, tx.value, ETH, payment)
         payment = yield call(setTo, tx.to, payment)
       } else {
         if (!tx.data) throw new Error('NO_ERC20_DATA')
@@ -556,7 +525,7 @@ export default ({ api, coreSagas, networks }: { api: APIType; coreSagas; network
         )
         const to = EthUtil.toChecksumAddress(`0x${tx.data?.slice(32, 72)}`)
 
-        payment = yield call(setAmount, value, coin, payment)
+        payment = yield call(setAmount, value, coin as Erc20CoinType, payment)
         payment = yield call(setTo, to, payment)
       }
 

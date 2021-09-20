@@ -139,11 +139,55 @@ export default ({ get, post, rootUrl }) => {
       url: rootUrl
     })
 
-  const remindGuid = (email, captchaToken, sessionToken) =>
+  const remindGuid = (email, captchaToken, sessionToken) => {
     post({
-      data: { captcha: captchaToken, email, method: 'send-guid-reminder' },
+      data: {
+        captcha: captchaToken,
+        email,
+        method: 'send-guid-reminder',
+        siteKey: window.CAPTCHA_KEY
+      },
       endPoint: '/wallet',
       sessionToken,
+      url: rootUrl
+    })
+  }
+
+  const triggerWalletMagicLinkLegacy = (email, captchaToken, sessionToken) => {
+    post({
+      data: {
+        captcha: captchaToken,
+        email,
+        method: 'send-guid-reminder',
+        siteKey: window.CAPTCHA_KEY
+      },
+      endPoint: '/wallet',
+      sessionToken,
+      url: rootUrl
+    })
+  }
+
+  // marks timestamp when user last backed up phrase
+  const updateMnemonicBackup = (sharedKey, guid) =>
+    post({
+      data: { guid, method: 'update-mnemonic-backup', sharedKey },
+      endPoint: '/wallet',
+      url: rootUrl
+    })
+
+  // endpoint is triggered when mnemonic is viewed
+  const triggerMnemonicViewedAlert = (sharedKey, guid) =>
+    post({
+      data: { format: 'json', guid, method: 'trigger-alert', sharedKey },
+      endPoint: '/wallet',
+      url: rootUrl
+    })
+
+  // Trigger non-custodial sent email
+  const triggerNonCustodialSendAlert = (sharedKey, guid, currency, amount) =>
+    post({
+      data: { amount, currency, guid, method: 'trigger-sent-tx-email', sharedKey },
+      endPoint: '/wallet',
       url: rootUrl
     })
 
@@ -162,7 +206,8 @@ export default ({ get, post, rootUrl }) => {
         contact_email: newEmail,
         email,
         guid,
-        method: 'reset-two-factor-form'
+        method: 'reset-two-factor-form',
+        siteKey: window.CAPTCHA_KEY
       },
       endPoint: '/wallet',
       sessionToken,
@@ -176,7 +221,7 @@ export default ({ get, post, rootUrl }) => {
       url: rootUrl
     })
 
-  const authorizeLogin = (token, confirm) =>
+  const authorizeLogin = (token, confirm, sessionToken) =>
     post({
       data: {
         confirm_approval: confirm,
@@ -184,6 +229,7 @@ export default ({ get, post, rootUrl }) => {
         token
       },
       endPoint: '/wallet',
+      sessionToken,
       url: rootUrl
     })
 
@@ -238,6 +284,10 @@ export default ({ get, post, rootUrl }) => {
     reset2fa,
     savePayload,
     sendSecureChannel,
+    triggerMnemonicViewedAlert,
+    triggerNonCustodialSendAlert,
+    triggerWalletMagicLinkLegacy,
+    updateMnemonicBackup,
     verifyEmailToken
   }
 }

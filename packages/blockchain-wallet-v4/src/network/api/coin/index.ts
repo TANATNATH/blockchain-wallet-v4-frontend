@@ -1,25 +1,19 @@
-import { CoinType } from 'core/types'
+import { IndexMultiResponseType } from './types'
 
-export default ({ apiUrl, get, post }) => {
-  const getCoinPrices = (coins, timestamp) =>
+export default ({ apiUrl, post }) => {
+  const getCoinPrices = (
+    coins: { base: string; quote: string }[],
+    timestamp?: number
+  ): IndexMultiResponseType =>
     post({
-      url: apiUrl,
-      endPoint: timestamp
-        ? `/price/index-multi?time=${timestamp}`
-        : '/price/index-multi',
       contentType: 'application/json',
+      data: coins,
+      endPoint: timestamp ? `/price/index-multi?time=${timestamp}` : '/price/index-multi',
       removeDefaultPostData: true,
-      data: coins
+      url: apiUrl
     })
 
-  const getCoinTicker = (coin: CoinType) =>
-    get({
-      url: apiUrl,
-      endPoint: '/ticker',
-      data: { base: coin }
-    })
   return {
-    getCoinPrices,
-    getCoinTicker
+    getCoinPrices
   }
 }

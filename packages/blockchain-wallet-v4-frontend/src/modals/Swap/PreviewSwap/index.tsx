@@ -14,8 +14,7 @@ import {
   Text,
   TextGroup
 } from 'blockchain-info-components'
-import { formatCoin } from 'blockchain-wallet-v4/src/exchange/currency'
-import { SupportedWalletCurrenciesType } from 'blockchain-wallet-v4/src/types'
+import { formatCoin } from 'blockchain-wallet-v4/src/exchange/utils'
 import { ErrorCartridge } from 'components/Cartridge'
 import { FlyoutWrapper, Row, Title, Value } from 'components/Flyout'
 import { actions, selectors } from 'data'
@@ -31,7 +30,7 @@ const StyledRow = styled(Row)`
   justify-content: flex-start;
   align-items: center;
   padding-top: 30px;
-  padding-bottom: 30px;
+  padding-bottom: 24px;
 
   & > div:first-child {
     width: 100%;
@@ -59,6 +58,16 @@ const ToolTipText = styled.div`
   }
 `
 
+const ExchangeRateRow = styled.div`
+  display: flex;
+`
+const IconWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 4px;
+`
 class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, State> {
   constructor(props) {
     super(props)
@@ -80,9 +89,9 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
 
     const { BASE, COUNTER } = this.props.initSwapFormValues
 
-    const { coins, swapActions } = this.props
-    const baseCoinTicker = coins[BASE.coin].coinTicker
-    const counterCoinTicker = coins[COUNTER.coin].coinTicker
+    const { swapActions } = this.props
+    const baseCoinTicker = BASE.coin
+    const counterCoinTicker = COUNTER.coin
     return (
       <>
         <FlyoutWrapper>
@@ -110,7 +119,7 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
           accountType={BASE.type}
           amount={this.props.swapAmountFormValues?.cryptoAmount}
           base
-          coinCode={coins[BASE.coin].coinCode}
+          coinCode={BASE.coin}
           label={BASE.label}
         >
           <FormattedMessage id='copy.from' defaultMessage='From' />
@@ -134,7 +143,7 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
                 accountType={COUNTER.type}
                 amount={value.amt}
                 base={false}
-                coinCode={coins[COUNTER.coin].coinCode}
+                coinCode={COUNTER.coin}
                 label={COUNTER.label}
               >
                 <FormattedMessage id='copy.to' defaultMessage='To' />
@@ -145,24 +154,28 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
         <StyledRow>
           <div>
             <Title>
-              <TextGroup inline>
-                <FormattedMessage
-                  id='modals.simplebuy.confirm.rate'
-                  defaultMessage='Exchange Rate'
-                />
-                <Icon
-                  name='question-in-circle-filled'
-                  size='16px'
-                  color='blue600'
-                  onClick={() =>
-                    this.setState((prevState) => ({
-                      isActiveExchangeToolTip: !prevState.isActiveExchangeToolTip
-                    }))
-                  }
-                />
-              </TextGroup>
+              <ExchangeRateRow>
+                <Text color='grey900' weight={500}>
+                  <FormattedMessage
+                    id='modals.simplebuy.confirm.rate'
+                    defaultMessage='Exchange Rate'
+                  />
+                </Text>
+                <IconWrapper>
+                  <Icon
+                    name='question-in-circle-filled'
+                    size='16px'
+                    color={this.state.isActiveExchangeToolTip ? 'blue600' : 'grey300'}
+                    onClick={() =>
+                      this.setState((prevState) => ({
+                        isActiveExchangeToolTip: !prevState.isActiveExchangeToolTip
+                      }))
+                    }
+                  />
+                </IconWrapper>
+              </ExchangeRateRow>
             </Title>
-            <Value data-e2e='swapExchangeRate'>
+            <Value data-e2e='swapExchangeRate' style={{ marginTop: 0 }}>
               {this.props.quoteR.cata({
                 Failure: () => (
                   <Text size='14px' color='red600'>
@@ -172,9 +185,9 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
                 Loading: () => <SkeletonRectangle height='18px' width='70px' />,
                 NotAsked: () => <SkeletonRectangle height='18px' width='70px' />,
                 Success: (val) => (
-                  <>
+                  <Text weight={400} color='grey900'>
                     1 {baseCoinTicker} = {formatCoin(val.rate)} {counterCoinTicker}
-                  </>
+                  </Text>
                 )
               })}
             </Value>
@@ -194,7 +207,7 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
                   />{' '}
                   {BASE.coin}{' '}
                   <Link
-                    href='https://support.blockchain.com/hc/en-us/articles/360018358111-Why-do-Swap-exchange-rates-change-'
+                    href='https://support.blockchain.com/hc/en-us/articles/360061672651'
                     size='12px'
                     rel='noopener noreferrer'
                     target='_blank'
@@ -211,12 +224,10 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
         </StyledRow>
         <Row style={{ borderTop: '0' }}>
           <FeeBreakdownBox
-            coins={coins}
             counter={COUNTER}
             counterQuote={this.props.quoteR}
             base={BASE}
             basePayment={this.props.paymentR}
-            supportedCoins={this.props.supportedCoins}
           />
           <TextGroup inline style={{ marginTop: '16px', textAlign: 'center' }}>
             <Text size='12px' weight={500} color='grey600'>
@@ -227,7 +238,7 @@ class PreviewSwap extends PureComponent<InjectedFormProps<{}, Props> & Props, St
             </Text>
             <Text size='12px' weight={500} color='grey600'>
               <Link
-                href='https://support.blockchain.com/hc/en-us/articles/360025732012-Can-I-cancel-my-Swap-order-'
+                href='https://support.blockchain.com/hc/en-us/articles/360061942111'
                 size='12px'
                 rel='noopener noreferrer'
                 target='_blank'
@@ -288,9 +299,6 @@ const mapStateToProps = (state: RootState) => ({
   initSwapFormValues: selectors.form.getFormValues('initSwap')(state) as InitSwapFormValuesType,
   paymentR: selectors.components.swap.getPayment(state),
   quoteR: selectors.components.swap.getQuote(state),
-  supportedCoins: selectors.core.walletOptions
-    .getSupportedCoins(state)
-    .getOrElse({} as SupportedWalletCurrenciesType),
   swapAmountFormValues: selectors.form.getFormValues('swapAmount')(state) as SwapAmountFormValues
 })
 

@@ -1,11 +1,18 @@
+/* eslint-disable import/no-extraneous-dependencies */
 import axios from 'axios'
 import { Moment } from 'moment'
 import { v4 as uuidv4 } from 'uuid'
 
-import { BankTransferAccountType, UserDataType } from 'data/types'
+import {
+  BankTransferAccountType,
+  RecurringBuyNextPayment,
+  RecurringBuyPeriods,
+  RecurringBuyRegisteredList,
+  UserDataType
+} from 'data/types'
 
-import { CoinType, CurrenciesType, FiatType, WalletCurrencyType } from '../../../types'
-import { NabuCustodialProductType, ProductTypes } from '../custodial/types'
+import { CoinType, FiatCurrenciesType, FiatType, WalletCurrencyType } from '../../../types'
+import { NabuCustodialProductType, ProductTypes, WithdrawResponseType } from '../custodial/types'
 import { SwapOrderStateType, SwapOrderType, SwapUserLimitsType } from '../swap/types'
 import {
   FiatEligibleType,
@@ -20,6 +27,7 @@ import {
   SBPairType,
   SBPaymentMethodsType,
   SBPaymentMethodType,
+  SBPaymentTypes,
   SBProviderAttributesType,
   SBQuoteType,
   SBTransactionStateType,
@@ -97,6 +105,7 @@ export default ({
     input: SBMoneyType,
     output: SBMoneyType,
     paymentType: SBPaymentMethodType['type'],
+    period?: RecurringBuyPeriods,
     paymentMethodId?: SBCardType['id']
   ): SBOrderType =>
     authorizedPost({
@@ -107,7 +116,8 @@ export default ({
         output,
         pair,
         paymentMethodId,
-        paymentType
+        paymentType,
+        period
       },
       endPoint: `/simple-buy/trades${pending ? '?action=pending' : ''}`,
       removeDefaultPostData: true,
@@ -203,11 +213,11 @@ export default ({
       url: nabuUrl
     })
 
-  const getSBFiatEligible = (currency: keyof CurrenciesType): FiatEligibleType =>
+  const getSBFiatEligible = (currency: keyof FiatCurrenciesType): FiatEligibleType =>
     authorizedGet({
       data: {
         fiatCurrency: currency,
-        methods: 'PAYMENT_CARD,BANK_ACCOUNT,BANK_TRANSFER'
+        methods: `${SBPaymentTypes.PAYMENT_CARD},${SBPaymentTypes.BANK_ACCOUNT},${SBPaymentTypes.BANK_TRANSFER}`
       },
       endPoint: '/simple-buy/eligible',
       url: nabuUrl
@@ -239,7 +249,7 @@ export default ({
       url: nabuUrl
     })
 
-  const getSBPairs = (currency: keyof CurrenciesType): { pairs: Array<SBPairType> } =>
+  const getSBPairs = (currency: keyof FiatCurrenciesType): { pairs: Array<SBPairType> } =>
     get({
       data: {
         fiatCurrency: currency
@@ -248,7 +258,7 @@ export default ({
       url: nabuUrl
     })
 
-  const getSBPaymentAccount = (currency: keyof CurrenciesType): SBAccountType =>
+  const getSBPaymentAccount = (currency: keyof FiatCurrenciesType): SBAccountType =>
     authorizedPut({
       contentType: 'application/json',
       data: {
@@ -274,6 +284,35 @@ export default ({
       url: nabuUrl
     })
 
+  const getRBRegisteredList = (): RecurringBuyRegisteredList[] =>
+    authorizedGet({
+      contentType: 'application/json',
+      endPoint: '/recurring-buy/list',
+      url: nabuUrl
+    })
+
+  const getRBPaymentInfo = (): { nextPayments: RecurringBuyNextPayment[] } =>
+    authorizedGet({
+      contentType: 'application/json',
+      endPoint: '/recurring-buy/next-payment',
+      url: nabuUrl
+    })
+
+  const createRecurringBuy = (data): RecurringBuyRegisteredList =>
+    authorizedPost({
+      contentType: 'application/json',
+      data,
+      endPoint: '/recurring-buy/create',
+      url: nabuUrl
+    })
+
+  const deleteRecurringBuy = (id): RecurringBuyRegisteredList =>
+    authorizedDelete({
+      contentType: 'application/json',
+      endPoint: `/recurring-buy/${id}/cancel`,
+      url: nabuUrl
+    })
+
   const getSBQuote = (
     currencyPair: SBPairsType,
     action: SBOrderActionType,
@@ -290,7 +329,7 @@ export default ({
     })
 
   type getSBTransactionsType = {
-    currency: WalletCurrencyType
+    currency: string
     fromId?: string
     fromValue?: string
     limit?: number
@@ -394,10 +433,10 @@ export default ({
 
   const withdrawSBFunds = (
     address: string,
-    currency: keyof CurrenciesType,
+    currency: string,
     amount: string,
     fee?: number
-  ) =>
+  ): WithdrawResponseType =>
     authorizedPost({
       contentType: 'application/json',
       data: {
@@ -433,12 +472,16 @@ export default ({
     confirmSBOrder,
     createBankAccountLink,
     createFiatDeposit,
+    createRecurringBuy,
     createSBCard,
     createSBOrder,
+    deleteRecurringBuy,
     deleteSavedAccount,
     getBankTransferAccountDetails,
     getBankTransferAccounts,
     getPaymentById,
+    getRBPaymentInfo,
+    getRBRegisteredList,
     getSBBalances,
     getSBCard,
     getSBCards,

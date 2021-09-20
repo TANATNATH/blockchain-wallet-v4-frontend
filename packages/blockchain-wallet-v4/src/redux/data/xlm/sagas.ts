@@ -22,9 +22,9 @@ import {
 } from 'ramda'
 import { all, call, put, select } from 'redux-saga/effects'
 
+import { FetchCustodialOrdersAndTransactionsReturnType } from 'blockchain-wallet-v4/src/types'
 import { APIType } from 'core/network/api'
 import { XlmTxType } from 'core/transactions/types'
-import { FetchCustodialOrdersAndTransactionsReturnType } from 'core/types'
 
 import * as Exchange from '../../../exchange'
 import Remote from '../../../remote'
@@ -51,7 +51,7 @@ export const sumBigNumbers = reduce(
 const sumBalance = compose(
   sumBigNumbers,
   // @ts-ignore
-  map(account => account.map(S.selectBalanceFromAccount).getOrElse('0')),
+  map((account) => account.map(S.selectBalanceFromAccount).getOrElse('0')),
   // @ts-ignore
   values
 )
@@ -59,7 +59,7 @@ const sumBalance = compose(
 export default ({ api, networks }: { api: APIType; networks: any }) => {
   const { fetchCustodialOrdersAndTransactions } = simpleBuySagas({ api })
 
-  const fetchLedgerDetails = function * () {
+  const fetchLedgerDetails = function* () {
     try {
       yield put(A.setLedgerDetailsLoading())
       const ledger = yield call(api.getLatestLedgerDetails)
@@ -69,16 +69,7 @@ export default ({ api, networks }: { api: APIType; networks: any }) => {
     }
   }
 
-  const createAccounts = function * () {
-    if (networks.xlm !== 'testnet') return
-    try {
-      const accountIds = yield select(S.getContext)
-      yield all(accountIds.map(id => call(api.createXlmAccount, id)))
-      yield call(fetchData)
-    } catch (e) {}
-  }
-
-  const fetchAccount = function * (id) {
+  const fetchAccount = function* (id) {
     try {
       yield put(A.fetchAccountLoading(id))
       const account = yield call(api.getXlmAccount, id)
@@ -88,33 +79,121 @@ export default ({ api, networks }: { api: APIType; networks: any }) => {
     }
   }
 
-  const fetchData = function * () {
+  const fetchData = function* () {
     const accountIds = yield select(S.getContext)
-    yield all(accountIds.map(id => call(fetchAccount, id)))
+    yield all(accountIds.map((id) => call(fetchAccount, id)))
     const accounts = yield select(S.getAccounts)
     const data = { info: { final_balance: sumBalance(accounts) } }
     yield put(A.fetchDataSuccess(data))
   }
 
-  const fetchRates = function * () {
+  const createAccounts = function* () {
+    if (networks.xlm !== 'testnet') return
     try {
-      yield put(A.setRatesLoading())
-      const data = yield call(api.getXlmTicker)
-      yield put(A.setRatesSuccess(data))
+      const accountIds = yield select(S.getContext)
+      yield all(accountIds.map((id) => call(api.createXlmAccount, id)))
+      yield call(fetchData)
     } catch (e) {
-      yield put(A.setRatesFailure(e))
+      // some catch
     }
   }
 
-  const fetchTransactions = function * (action) {
+  const __processTxs = function* (txList) {
+    const walletAccounts = (yield select(getAccounts)).getOrElse([])
+    const lockboxAccounts = (yield select(getLockboxXlmAccounts)).getOrElse([])
+    const txNotes = (yield select(getXlmTxNotes)).getOrElse({})
+    const accounts = concat(walletAccounts, lockboxAccounts)
+    return unnest(
+      map((tx) => {
+        const operations = decodeOperations(tx)
+        return compose(
+          // @ts-ignore
+          filter(prop('belongsToWallet')),
+          map(transformTx(accounts, txNotes, tx)),
+          // @ts-ignore
+          filter(isLumenOperation)
+        )(operations)
+      }, txList)
+    )
+  }
+
+  const __processReportTxs = function* (rawTxList, startDate, endDate) {
+    const mapIndexed = addIndex(map)
+    const fullTxList = yield call(__processTxs, rawTxList)
+    const xlmMarketData = selectors.data.coins.getRates('XLM', yield select()).getOrFail('No rates')
+
+    // remove txs that dont match coin type and are not within date range
+    const prunedTxList = filter(
+      // @ts-ignore
+      (tx) => moment.unix(tx.time).isBetween(startDate, endDate),
+      fullTxList
+    )
+
+    // return empty list if no tx found in filter set
+    if (!length(prunedTxList)) return []
+    // @ts-ignore
+    const txTimestamps = pluck('time', prunedTxList)
+    const currency = (yield select(selectors.settings.getCurrency)).getOrElse('USD')
+    const currentPrices = prop(currency, xlmMarketData)
+    const currentPrice = new BigNumber(prop('last', currentPrices))
+    const fiatSymbol = prop('symbol', currentPrices)
+
+    // fetch historical price data
+    const historicalPrices = yield call(api.getPriceTimestampSeries, 'XLM', currency, txTimestamps)
+
+    // build and return report model
+    return mapIndexed((tx, idx) => {
+      const timeFormatted = join(
+        ' ',
+        takeLast(
+          2,
+          moment
+            // @ts-ignore
+            .unix(tx.time)
+            .toString()
+            .split(' ')
+        )
+      )
+      // @ts-ignore
+      const txType = prop('type', tx)
+      const negativeSignOrEmpty = equals('sent', txType) ? '-' : ''
+      const priceAtTime = new BigNumber(
+        // @ts-ignore
+        prop('price', nth(idx, historicalPrices))
+      )
+      const amountBig = new BigNumber(
+        Exchange.convertCoinToCoin({
+          coin: 'XLM',
+          // @ts-ignore
+          value: tx.amount
+        })
+      )
+      const valueThen = amountBig.multipliedBy(priceAtTime).toFixed(2)
+      const valueNow = amountBig.multipliedBy(currentPrice).toFixed(2)
+      return {
+        amount: `${negativeSignOrEmpty}${amountBig.toString()}`,
+        // @ts-ignore
+        date: moment.unix(prop('time', tx)).format('YYYY-MM-DD'),
+        // @ts-ignore
+        description: prop('description', tx),
+
+        exchange_rate_then: fiatSymbol + priceAtTime.toFixed(2),
+        // @ts-ignore
+        hash: prop('hash', tx),
+        time: timeFormatted,
+        type: txType,
+        value_now: `${fiatSymbol}${negativeSignOrEmpty}${valueNow}`,
+        value_then: `${fiatSymbol}${negativeSignOrEmpty}${valueThen}`
+      }
+    }, prunedTxList)
+  }
+
+  const fetchTransactions = function* (action) {
     try {
       const { payload } = action
       const { accountId, reset } = payload
-      const defaultAccountR = yield select(
-        selectors.kvStore.xlm.getDefaultAccountId
-      )
-      const publicKey =
-        accountId || defaultAccountR.getOrFail(ACCOUNT_NOT_FOUND)
+      const defaultAccountR = yield select(selectors.kvStore.xlm.getDefaultAccountId)
+      const publicKey = accountId || defaultAccountR.getOrFail(ACCOUNT_NOT_FOUND)
       const pages = yield select(S.getTransactions)
       const pagingToken = (last(pages) || Remote.NotAsked)
         .map(last)
@@ -128,12 +207,14 @@ export default ({ api, networks }: { api: APIType; networks: any }) => {
       let txs: Array<any> = []
       try {
         txs = yield call(api.getXlmTransactions, {
-          publicKey,
           limit: TX_PER_PAGE,
           pagingToken,
+          publicKey,
           reset
         })
-      } catch (e) {}
+      } catch (e) {
+        // some cacth
+      }
       const atBounds = length(txs) < TX_PER_PAGE
       yield put(A.transactionsAtBound(atBounds))
       const nextSBTransactionsURL = selectors.data.custodial.getNextSBTransactionsURL(
@@ -164,15 +245,15 @@ export default ({ api, networks }: { api: APIType; networks: any }) => {
     }
   }
 
-  const fetchTransactionHistory = function * ({ payload }) {
+  const fetchTransactionHistory = function* ({ payload }) {
     const { address, end, start } = payload
     let pagingToken
 
     try {
       yield put(A.fetchTransactionHistoryLoading())
       let fullTxList = yield call(api.getXlmTransactions, {
-        publicKey: address,
-        limit: TX_REPORT_PAGE_SIZE
+        limit: TX_REPORT_PAGE_SIZE,
+        publicKey: address
       })
       // @ts-ignore
       pagingToken = prop('paging_token', last(fullTxList))
@@ -182,9 +263,9 @@ export default ({ api, networks }: { api: APIType; networks: any }) => {
       // @ts-ignore
       while (moment(prop('created_at', last(fullTxList))).isAfter(start)) {
         const txPage = yield call(api.getXlmTransactions, {
-          publicKey: address,
           limit: TX_REPORT_PAGE_SIZE,
-          pagingToken
+          pagingToken,
+          publicKey: address
         })
         // exit if no results returned
         if (!length(txPage)) break
@@ -192,124 +273,19 @@ export default ({ api, networks }: { api: APIType; networks: any }) => {
         pagingToken = prop('paging_token', last(txPage))
         fullTxList = fullTxList.concat(txPage)
       }
-      const processedTxList = yield call(
-        __processReportTxs,
-        fullTxList,
-        start,
-        end
-      )
+      const processedTxList = yield call(__processReportTxs, fullTxList, start, end)
       yield put(A.fetchTransactionHistorySuccess(processedTxList))
     } catch (e) {
       yield put(A.fetchTransactionHistoryFailure(e.message))
     }
   }
 
-  const __processReportTxs = function * (rawTxList, startDate, endDate) {
-    const mapIndexed = addIndex(map)
-    const fullTxList = yield call(__processTxs, rawTxList)
-    const xlmMarketData = (yield select(
-      selectors.data.xlm.getRates
-    )).getOrFail()
-
-    // remove txs that dont match coin type and are not within date range
-    const prunedTxList = filter(
-      // @ts-ignore
-      tx => moment.unix(tx.time).isBetween(startDate, endDate),
-      fullTxList
-    )
-
-    // return empty list if no tx found in filter set
-    if (!length(prunedTxList)) return []
-    // @ts-ignore
-    const txTimestamps = pluck('time', prunedTxList)
-    const currency = (yield select(selectors.settings.getCurrency)).getOrElse(
-      'USD'
-    )
-    const currentPrices = prop(currency, xlmMarketData)
-    const currentPrice = new BigNumber(prop('last', currentPrices))
-    const fiatSymbol = prop('symbol', currentPrices)
-
-    // fetch historical price data
-    const historicalPrices = yield call(
-      api.getPriceTimestampSeries,
-      'XLM',
-      currency,
-      txTimestamps
-    )
-
-    // build and return report model
-    return mapIndexed((tx, idx) => {
-      const timeFormatted = join(
-        ' ',
-        takeLast(
-          2,
-          moment
-            // @ts-ignore
-            .unix(tx.time)
-            .toString()
-            .split(' ')
-        )
-      )
-      // @ts-ignore
-      const txType = prop('type', tx)
-      const negativeSignOrEmpty = equals('sent', txType) ? '-' : ''
-      const priceAtTime = new BigNumber(
-        // @ts-ignore
-        prop('price', nth(idx, historicalPrices))
-      )
-      const amountBig = new BigNumber(
-        Exchange.convertXlmToXlm({
-          // @ts-ignore
-          value: tx.amount,
-          fromUnit: 'STROOP',
-          toUnit: 'XLM'
-        }).value
-      )
-      const valueThen = amountBig.multipliedBy(priceAtTime).toFixed(2)
-      const valueNow = amountBig.multipliedBy(currentPrice).toFixed(2)
-      return {
-        amount: `${negativeSignOrEmpty}${amountBig.toString()}`,
-        // @ts-ignore
-        date: moment.unix(prop('time', tx)).format('YYYY-MM-DD'),
-        // @ts-ignore
-        description: prop('description', tx),
-        // @ts-ignore
-        hash: prop('hash', tx),
-        time: timeFormatted,
-        type: txType,
-        value_then: `${fiatSymbol}${negativeSignOrEmpty}${valueThen}`,
-        value_now: `${fiatSymbol}${negativeSignOrEmpty}${valueNow}`,
-        exchange_rate_then: fiatSymbol + priceAtTime.toFixed(2)
-      }
-    }, prunedTxList)
-  }
-
-  const __processTxs = function * (txList) {
-    const walletAccounts = (yield select(getAccounts)).getOrElse([])
-    const lockboxAccounts = (yield select(getLockboxXlmAccounts)).getOrElse([])
-    const txNotes = (yield select(getXlmTxNotes)).getOrElse({})
-    const accounts = concat(walletAccounts, lockboxAccounts)
-    return unnest(
-      map(tx => {
-        const operations = decodeOperations(tx)
-        return compose(
-          // @ts-ignore
-          filter(prop('belongsToWallet')),
-          map(transformTx(accounts, txNotes, tx)),
-          // @ts-ignore
-          filter(isLumenOperation)
-        )(operations)
-      }, txList)
-    )
-  }
-
   return {
+    __processTxs,
     createAccounts,
-    fetchLedgerDetails,
     fetchData,
-    fetchRates,
-    fetchTransactions,
+    fetchLedgerDetails,
     fetchTransactionHistory,
-    __processTxs
+    fetchTransactions
   }
 }

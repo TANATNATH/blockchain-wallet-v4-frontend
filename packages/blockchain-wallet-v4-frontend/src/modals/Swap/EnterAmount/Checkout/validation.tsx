@@ -3,14 +3,11 @@ import BigNumber from 'bignumber.js'
 import { Exchange } from 'blockchain-wallet-v4/src'
 import {
   PaymentValue,
-  RateType,
+  RatesType,
   SwapQuoteType,
   SwapUserLimitsType
 } from 'blockchain-wallet-v4/src/types'
-import {
-  convertBaseToStandard,
-  convertStandardToBase
-} from 'data/components/exchange/services'
+import { convertBaseToStandard, convertStandardToBase } from 'data/components/exchange/services'
 import { SwapAccountType, SwapAmountFormValues } from 'data/types'
 import { CRYPTO_DECIMALS } from 'services/forms'
 
@@ -19,7 +16,7 @@ import { Props } from '.'
 export const getMaxMin = (
   minOrMax: 'min' | 'max',
   limits: SwapUserLimitsType,
-  baseRate: RateType,
+  baseRate: RatesType,
   payment: undefined | PaymentValue,
   quote: { quote: SwapQuoteType; rate: number },
   BASE: SwapAccountType,
@@ -27,17 +24,12 @@ export const getMaxMin = (
 ) => {
   switch (minOrMax) {
     case 'max':
-      const fiatMax = new BigNumber(
-        convertBaseToStandard('FIAT', limits.maxPossibleOrder)
-      )
+      const fiatMax = new BigNumber(convertBaseToStandard('FIAT', limits.maxPossibleOrder))
       const cryptoMax = new BigNumber(
-        convertStandardToBase(BASE.coin, fiatMax.dividedBy(baseRate.last))
+        convertStandardToBase(BASE.coin, fiatMax.dividedBy(baseRate.price))
       )
       const userMax = Number(payment ? payment.effectiveBalance : BASE.balance)
-      return convertBaseToStandard(
-        BASE.coin,
-        Math.min(userMax, cryptoMax.toNumber())
-      )
+      return convertBaseToStandard(BASE.coin, Math.min(userMax, cryptoMax.toNumber()))
     case 'min':
       // AOTW = As Of This Writing
       // ℹ️
@@ -57,16 +49,13 @@ export const getMaxMin = (
       // /trades/limits is returned in FIAT (3.5 USD)
       const fiatMin = convertBaseToStandard('FIAT', limits.minOrder)
       // convert 3.5 USD to BASE coin (0.01123091 ETH)
-      const baseMin = new BigNumber(fiatMin).dividedBy(baseRate.last).toNumber()
+      const baseMin = new BigNumber(fiatMin).dividedBy(baseRate.price).toNumber()
 
       // calculate the BTC -> ETH rate
       // 1 BTC = 39.12444194 ETH
       const exRate = new BigNumber(1).dividedBy(quote.rate)
       // BTC fee is 0.0004517 BTC a.k.a 4517 satoshi
-      const standardCounterFee = convertBaseToStandard(
-        COUNTER.coin,
-        quote.quote.networkFee
-      )
+      const standardCounterFee = convertBaseToStandard(COUNTER.coin, quote.quote.networkFee)
       // 4517 satoshi is 0.017672510 ETH is 7 USD (AOTW)
       const counterFeeInBase = exRate.times(standardCounterFee).toNumber()
 
@@ -75,11 +64,7 @@ export const getMaxMin = (
   }
 }
 
-export const maximumAmount = (
-  value: string,
-  allValues: SwapAmountFormValues,
-  restProps: Props
-) => {
+export const maximumAmount = (value: string, allValues: SwapAmountFormValues, restProps: Props) => {
   if (!value) return true
   if (!allValues) return
 
@@ -87,32 +72,19 @@ export const maximumAmount = (
   const { baseRates, fix, limits, payment, quote, walletCurrency } = restProps
 
   const cryptoMax = Number(
-    getMaxMin(
-      'max',
-      limits,
-      baseRates[walletCurrency],
-      payment,
-      quote,
-      restProps.BASE,
-      restProps.COUNTER
-    )
+    getMaxMin('max', limits, baseRates, payment, quote, restProps.BASE, restProps.COUNTER)
   )
-  const fiatMax = Exchange.convertCoinToFiat(
-    cryptoMax,
-    restProps.BASE.coin,
-    walletCurrency,
-    baseRates
-  )
-  return Number(value) > (fix === 'CRYPTO' ? cryptoMax : fiatMax)
-    ? 'ABOVE_MAX'
-    : false
+  const fiatMax = Exchange.convertCoinToFiat({
+    coin: restProps.BASE.coin,
+    currency: walletCurrency,
+    isStandard: true,
+    rates: baseRates,
+    value: cryptoMax
+  })
+  return Number(value) > (fix === 'CRYPTO' ? cryptoMax : fiatMax) ? 'ABOVE_MAX' : false
 }
 
-export const minimumAmount = (
-  value: string,
-  allValues: SwapAmountFormValues,
-  restProps: Props
-) => {
+export const minimumAmount = (value: string, allValues: SwapAmountFormValues, restProps: Props) => {
   if (!value) return true
   if (!allValues) return
 
@@ -120,32 +92,20 @@ export const minimumAmount = (
   const { baseRates, fix, limits, payment, quote, walletCurrency } = restProps
 
   const cryptoMin = Number(
-    getMaxMin(
-      'min',
-      limits,
-      baseRates[walletCurrency],
-      payment,
-      quote,
-      restProps.BASE,
-      restProps.COUNTER
-    )
+    getMaxMin('min', limits, baseRates, payment, quote, restProps.BASE, restProps.COUNTER)
   )
-  const fiatMin = Exchange.convertCoinToFiat(
-    cryptoMin,
-    restProps.BASE.coin,
-    walletCurrency,
-    baseRates
-  )
+  const fiatMin = Exchange.convertCoinToFiat({
+    coin: restProps.BASE.coin,
+    currency: walletCurrency,
+    isStandard: true,
+    rates: baseRates,
+    value: cryptoMin
+  })
 
-  return Number(value) < (fix === 'CRYPTO' ? cryptoMin : fiatMin)
-    ? 'BELOW_MIN'
-    : false
+  return Number(value) < (fix === 'CRYPTO' ? cryptoMin : fiatMin) ? 'BELOW_MIN' : false
 }
 
-export const maximumAmountSilver = (
-  restProps: Props,
-  amtError: string | boolean
-) => {
+export const maximumAmountSilver = (restProps: Props, amtError: string | boolean) => {
   // @ts-ignore
   const { limits, userData } = restProps
   if (userData.tiers.current === 2) return

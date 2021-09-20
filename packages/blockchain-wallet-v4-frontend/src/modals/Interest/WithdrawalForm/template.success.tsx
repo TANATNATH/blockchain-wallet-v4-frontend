@@ -4,10 +4,10 @@ import { connect } from 'react-redux'
 import { compose } from 'redux'
 import { InjectedFormProps, reduxForm } from 'redux-form'
 
-import { Button, Icon, SpinningLoader, Text } from 'blockchain-info-components'
+import { Button, SpinningLoader, Text } from 'blockchain-info-components'
 import { Exchange } from 'blockchain-wallet-v4/src'
 import { convertCoinToFiat } from 'blockchain-wallet-v4/src/exchange'
-import { fiatToString, formatFiat } from 'blockchain-wallet-v4/src/exchange/currency'
+import { fiatToString, formatFiat } from 'blockchain-wallet-v4/src/exchange/utils'
 import { FiatType } from 'blockchain-wallet-v4/src/types'
 import FiatDisplay from 'components/Display/FiatDisplay'
 import { CoinBalanceDropdown, NumberBox } from 'components/Form'
@@ -31,7 +31,6 @@ import {
   CustomField,
   CustomForm,
   CustomFormLabel,
-  CustomOrangeCartridge,
   MaxAmountContainer,
   NetworkFee,
   PrincipalCcyAbsolute,
@@ -61,13 +60,14 @@ const WithdrawalForm: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
     invalid,
     rates,
     submitting,
-    supportedCoins,
     values,
     walletCurrency
   } = props
 
   const currencySymbol = Exchange.getSymbol(walletCurrency) as string
-  const { coinTicker, displayName } = supportedCoins[coin]
+  const { coinfig } = window.coins[coin]
+  const coinTicker = coin
+  const displayName = coinfig.name
   const account = accountBalances[coin]
   const accountBalanceBase = account && account.balance
   const interestBalanceBase = account && account.totalInterest
@@ -75,7 +75,13 @@ const WithdrawalForm: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
   const interestBalanceStandard = convertBaseToStandard(coin, interestBalanceBase)
   const availToWithdrawCrypto = convertBaseToStandard(coin, availToWithdraw)
   const withdrawalAmount = (values && values.withdrawalAmount) || 0
-  const availToWithdrawFiat = convertCoinToFiat(availToWithdrawCrypto, coin, walletCurrency, rates)
+  const availToWithdrawFiat = convertCoinToFiat({
+    coin,
+    currency: walletCurrency,
+    isStandard: true,
+    rates,
+    value: availToWithdrawCrypto
+  })
   const withdrawalAmountFiat = amountToFiat(
     displayCoin,
     withdrawalAmount,
@@ -107,7 +113,11 @@ const WithdrawalForm: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
 
   const handleFormSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault()
-    interestActions.requestWithdrawal(coin, withdrawalAmountCrypto)
+    interestActions.requestWithdrawal({
+      coin,
+      withdrawalAmountCrypto,
+      withdrawalAmountFiat
+    })
     props.setShowSupply(showEDDWithdrawLimit)
   }
 
@@ -135,7 +145,7 @@ const WithdrawalForm: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
             color='grey600'
             cursor
             name='arrow-left'
-            onClick={() => interestActions.showInterestModal('ACCOUNT_SUMMARY', coin)}
+            onClick={() => interestActions.showInterestModal({ coin, step: 'ACCOUNT_SUMMARY' })}
             size='20px'
           />
           <Text color='grey800' size='20px' weight={600}>
@@ -278,15 +288,14 @@ const WithdrawalForm: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
         </AmountFieldContainer>
 
         {showEDDWithdrawLimit && (
-          <CustomOrangeCartridge>
-            <Icon name='info' color='orange600' size='18px' style={{ marginRight: '12px' }} />
-            <CartrigeText>
+          <CartrigeText>
+            <Text color='orange600' size='14px' weight={500}>
               <FormattedMessage
-                id='modals.interest.withdrawal.edd_need'
-                defaultMessage='This amount requires further information. Confirm the withdrawal and follow the instructions on the next screen.'
+                id='modals.interest.withdrawal.edd_need_further_information'
+                defaultMessage='We will need to further verify your identity to make this withdrawal.'
               />
-            </CartrigeText>
-          </CustomOrangeCartridge>
+            </Text>
+          </CartrigeText>
         )}
       </Top>
       <Bottom>

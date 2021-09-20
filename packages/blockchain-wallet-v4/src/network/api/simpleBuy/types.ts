@@ -1,6 +1,7 @@
+/* eslint-disable import/no-extraneous-dependencies */
 import { CardNameType } from 'components/Form/CreditCardBox/model'
 import { BeneficiaryType, CoinType, FiatType, WalletCurrencyType } from 'core/types'
-import { BankDetails } from 'data/types'
+import { BankDetails, RecurringBuyFailureReasons, RecurringBuyPeriods } from 'data/types'
 
 export type Everypay3DSResponseType = {
   payment_state: null | 'waiting_for_3DS_response'
@@ -50,7 +51,7 @@ export type SBBalanceType = {
 }
 
 export type SBBalancesType = {
-  [key in WalletCurrencyType]?: SBBalanceType
+  [key in string]?: SBBalanceType
 }
 
 export type CustodialFromType = SBBalanceType & {
@@ -110,13 +111,14 @@ export type SBPairType = {
   sellMin: string
 }
 
-export type SBPaymentTypes =
-  | 'PAYMENT_CARD'
-  | 'BANK_ACCOUNT' // Wire Transfers
-  | 'FUNDS'
-  | 'USER_CARD'
-  | 'BANK_TRANSFER' // ACH
-  | 'LINK_BANK' // Also ACH
+export enum SBPaymentTypes {
+  BANK_ACCOUNT = 'BANK_ACCOUNT',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  FUNDS = 'FUNDS',
+  LINK_BANK = 'LINK_BANK',
+  PAYMENT_CARD = 'PAYMENT_CARD',
+  USER_CARD = 'USER_CARD'
+}
 
 export type SBPaymentMethodType = {
   addedAt?: string
@@ -177,6 +179,7 @@ export type ISBBuyOrderType = {
     qrcodeUrl?: string
   }
   expiresAt: string
+  failureReason?: RecurringBuyFailureReasons
   fee?: string
   id: string
   inputQuantity: string
@@ -184,7 +187,9 @@ export type ISBBuyOrderType = {
   outputQuantity: string
   paymentMethodId?: string
   paymentType?: SBPaymentMethodType['type']
+  period?: RecurringBuyPeriods
   price?: string
+  recurringBuyId?: string
   side: SBOrderActionType
   state: SBOrderStateType
   updatedAt: string

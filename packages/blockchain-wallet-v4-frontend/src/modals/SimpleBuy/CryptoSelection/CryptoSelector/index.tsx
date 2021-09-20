@@ -9,8 +9,8 @@ import { OrderType, SBPairType } from 'blockchain-wallet-v4/src/types'
 import { FlyoutWrapper } from 'components/Flyout'
 import { CoinAccountListOption } from 'components/Form'
 import { model } from 'data'
-import { SUPPORTED_COINS } from 'data/coins/model/swap'
 import { getCoinFromPair, getFiatFromPair } from 'data/components/simpleBuy/model'
+import { getCoins } from 'data/components/swap/selectors'
 import { SwapAccountType } from 'data/types'
 
 import { Props as OwnProps, SuccessStateType } from '../index'
@@ -133,7 +133,11 @@ const CryptoSelector: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
 
   return (
     <Wrapper>
-      <Form onSubmit={() => {}}>
+      <Form
+        onSubmit={() => {
+          // do nothing
+        }}
+      >
         <FlyoutWrapper>
           <CloseContainer>
             <Icon
@@ -226,7 +230,7 @@ const CryptoSelector: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
         <Currencies>
           {orderType === OrderType.SELL ? (
             checkAccountsBalances ? (
-              SUPPORTED_COINS.map((coin) => {
+              getCoins().map((coin) => {
                 const accounts = props.accounts[coin] as Array<SwapAccountType>
                 return accounts.map(
                   (account) =>
@@ -235,7 +239,7 @@ const CryptoSelector: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
                       <CoinAccountListOption
                         key={account.index}
                         account={account}
-                        coinModel={props.coins[account.coin]}
+                        coin={account.coin}
                         isAccountSelected={false}
                         isSwap={false}
                         onClick={() => handleSell(account)}
@@ -249,9 +253,9 @@ const CryptoSelector: React.FC<InjectedFormProps<{}, Props> & Props> = (props) =
               <SellEmptyState handleClose={props.handleClose} />
             )
           ) : (
-            props.pairs.map((value, index) => (
+            props.pairs.map((value) => (
               <CryptoItem
-                key={index}
+                key={`${getFiatFromPair(value.pair)}-${getCoinFromPair(value.pair)}`}
                 orderType={orderType}
                 fiat={getFiatFromPair(value.pair)}
                 coin={getCoinFromPair(value.pair)}

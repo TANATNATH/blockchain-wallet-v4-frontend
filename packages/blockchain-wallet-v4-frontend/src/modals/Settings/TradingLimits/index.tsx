@@ -6,6 +6,7 @@ import { Text } from 'blockchain-info-components'
 import Flyout, { duration, FlyoutChild } from 'components/Flyout'
 import { actions } from 'data'
 import { RootState } from 'data/rootReducer'
+import { ModalName } from 'data/types'
 import ModalEnhancer from 'providers/ModalEnhancer'
 
 import { ModalPropsType } from '../../types'
@@ -27,9 +28,12 @@ class TradingLimits extends PureComponent<Props, State> {
     /* eslint-disable */
     this.setState({ show: true })
     /* eslint-enable */
-    this.props.fetchUser()
+    // fetch user details to obtain most recent state
+    this.props.profileActions.fetchUserDataLoading()
+    this.props.profileActions.fetchUser()
     this.props.fetchProductsEligibility()
     this.props.fetchInterestEDDStatus()
+    this.props.simpleBuyActions.fetchSDDEligible()
   }
 
   handleClose = () => {
@@ -68,8 +72,12 @@ const mapDispatchToProps = (dispatch: Dispatch) => ({
   analyticsActions: bindActionCreators(actions.analytics, dispatch),
   fetchInterestEDDStatus: () => dispatch(actions.components.interest.fetchEDDStatus()),
   fetchProductsEligibility: () => dispatch(actions.components.settings.fetchProductsEligibility()),
-  fetchUser: () => dispatch(actions.modules.profile.fetchUser()),
-  identityVerificationActions: bindActionCreators(actions.components.identityVerification, dispatch)
+  identityVerificationActions: bindActionCreators(
+    actions.components.identityVerification,
+    dispatch
+  ),
+  profileActions: bindActionCreators(actions.modules.profile, dispatch),
+  simpleBuyActions: bindActionCreators(actions.components.simpleBuy, dispatch)
 })
 
 const mapStateToProps = (state: RootState) => ({
@@ -78,7 +86,10 @@ const mapStateToProps = (state: RootState) => ({
 
 const connector = connect(mapStateToProps, mapDispatchToProps)
 
-const enhance = compose(ModalEnhancer('TRADING_LIMITS', { transition: duration }), connector)
+const enhance = compose(
+  ModalEnhancer(ModalName.TRADING_LIMITS_MODAL, { transition: duration }),
+  connector
+)
 
 export type SuccessStateType = ReturnType<typeof getData>['data']
 

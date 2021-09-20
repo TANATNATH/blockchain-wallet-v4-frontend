@@ -12,9 +12,7 @@ import {
 
 import { Props } from '.'
 
-const FeaturesLarge = (
-  props: Props & { showModal: (modal: 'SEND' | 'REQUEST') => void }
-) => {
+const FeaturesLarge = (props: Props & { showModal: (modal: 'SEND' | 'REQUEST') => void }) => {
   return (
     <>
       <NavbarNavItem>
@@ -62,10 +60,7 @@ const FeaturesLarge = (
         >
           <NavbarNavItemIcon size='18px' name='cart-filled' />
           <NavbarNavItemTextHeader size='14px' weight={600}>
-            <FormattedMessage
-              id='buttons.buy_sell_crypto'
-              defaultMessage='Buy/Sell Crypto'
-            />
+            <FormattedMessage id='buttons.buy_sell_crypto' defaultMessage='Buy/Sell Crypto' />
           </NavbarNavItemTextHeader>
         </NavbarNavItemButton>
       </NavbarNavItem>
@@ -78,20 +73,6 @@ const FeaturesLarge = (
               <FormattedMessage
                 id='layouts.wallet.menuleft.navigation.earninterest'
                 defaultMessage='Earn Interest'
-              />
-            </NavbarNavItemTextHeader>
-          </NavbarNavItemButton>
-        </NavbarNavItem>
-      </LinkContainer>
-      <NavbarDivider />
-      <LinkContainer to='/borrow' activeClassName='active'>
-        <NavbarNavItem>
-          <NavbarNavItemButton data-e2e='borrowLink'>
-            <NavbarNavItemIcon size='18px' name='borrow' />
-            <NavbarNavItemTextHeader size='14px' weight={600}>
-              <FormattedMessage
-                id='layouts.wallet.menuleft.navigation.borrow'
-                defaultMessage='Borrow'
               />
             </NavbarNavItemTextHeader>
           </NavbarNavItemButton>

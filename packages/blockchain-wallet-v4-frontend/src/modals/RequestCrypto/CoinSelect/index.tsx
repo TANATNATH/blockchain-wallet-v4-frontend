@@ -1,18 +1,21 @@
 import React from 'react'
+import InfiniteScroll from 'react-infinite-scroll-component'
 import { FormattedMessage } from 'react-intl'
 import { connect, ConnectedProps } from 'react-redux'
-import { bindActionCreators } from 'redux'
+import { bindActionCreators, compose } from 'redux'
 import { Field } from 'redux-form'
 import styled from 'styled-components'
 
 import { Icon, Text } from 'blockchain-info-components'
 import { StickyHeaderFlyoutWrapper } from 'components/Flyout'
+import { StepHeader } from 'components/Flyout/SendRequestCrypto'
 import { CoinAccountListOption, SelectBoxCoin } from 'components/Form'
+import { data } from 'core/redux/selectors'
 import { actions } from 'data'
 import { SwapAccountType, SwapBaseCounterTypes } from 'data/components/swap/types'
 
 import { Props as OwnProps } from '..'
-import { REQUEST_FORM, StepHeader } from '../model'
+import { REQUEST_FORM } from '../model'
 import { RequestSteps } from '../types'
 import { getData } from './selectors'
 
@@ -33,17 +36,23 @@ const NoAccountsText = styled.div`
   text-align: center;
 `
 
-class RequestCoinSelect extends React.PureComponent<Props> {
+class RequestCoinSelect extends React.PureComponent<Props, { items: Props['data']['accounts'] }> {
+  constructor(props) {
+    super(props)
+    this.state = {
+      items: props.data.accounts.slice(0, 20)
+    }
+  }
+
+  fetchDataMock = () => {
+    console.log('here')
+    this.setState((state) => ({
+      items: this.props.data.accounts.slice(state.items.length, 20)
+    }))
+  }
+
   render() {
-    const {
-      data,
-      formActions,
-      handleClose,
-      requestableCoins,
-      setStep,
-      supportedCoins,
-      walletCurrency
-    } = this.props
+    const { data, formActions, handleClose, requestableCoins, setStep, walletCurrency } = this.props
     return (
       <Wrapper>
         <StickyHeaderFlyoutWrapper>
@@ -89,22 +98,37 @@ class RequestCoinSelect extends React.PureComponent<Props> {
             </SelectCoinWrapper>
           </div>
         </StickyHeaderFlyoutWrapper>
-        {data.accounts.map((account) => (
-          <CoinAccountListOption
-            key={account.address}
-            account={account}
-            coinModel={supportedCoins[account.coin]}
-            onClick={() => {
-              if (account.type === SwapBaseCounterTypes.CUSTODIAL && !data.isAtLeastTier1) {
-                setStep(RequestSteps.IDV_INTRO)
-              } else {
-                formActions.change(REQUEST_FORM, 'selectedAccount', account)
-                formActions.change(REQUEST_FORM, 'step', RequestSteps.SHOW_ADDRESS)
-              }
-            }}
-            walletCurrency={walletCurrency}
-          />
-        ))}
+        <div
+          id='scrollableDiv'
+          style={{
+            height: '400px',
+            overflow: 'auto'
+          }}
+        >
+          <InfiniteScroll
+            next={this.fetchDataMock}
+            loader={<div>loading</div>}
+            dataLength={data.accounts.length}
+            hasMore
+          >
+            {this.state.items.map((account) => (
+              <CoinAccountListOption
+                key={account.coin + account.address}
+                account={account}
+                coin={account.coin}
+                onClick={() => {
+                  if (account.type === SwapBaseCounterTypes.CUSTODIAL && !data.isAtLeastTier1) {
+                    setStep(RequestSteps.IDV_INTRO)
+                  } else {
+                    formActions.change(REQUEST_FORM, 'selectedAccount', account)
+                    formActions.change(REQUEST_FORM, 'step', RequestSteps.SHOW_ADDRESS)
+                  }
+                }}
+                walletCurrency={walletCurrency}
+              />
+            ))}
+          </InfiniteScroll>
+        </div>
         {data.accounts.length === 0 && (
           <NoAccountsText>
             <Text size='16px' color='grey900' weight={500} style={{ marginTop: '10px' }}>
@@ -129,6 +153,8 @@ const mapDispatchToProps = (dispatch) => ({
 })
 
 const connector = connect(mapStateToProps, mapDispatchToProps)
+const enhance = compose(connector)
+
 type Props = ConnectedProps<typeof connector> &
   OwnProps & {
     handleAccountChange: (account: SwapAccountType) => void
@@ -136,4 +162,4 @@ type Props = ConnectedProps<typeof connector> &
     setStep: (step: RequestSteps) => void
   }
 
-export default connector(RequestCoinSelect)
+export default enhance(RequestCoinSelect)

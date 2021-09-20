@@ -4,7 +4,7 @@ import { Form } from 'redux-form'
 import styled, { DefaultTheme } from 'styled-components'
 
 import { AllCoinsType, CoinAccountIcon, Text } from 'blockchain-info-components'
-import { coinToString } from 'blockchain-wallet-v4/src/exchange/currency'
+import { coinToString } from 'blockchain-wallet-v4/src/exchange/utils'
 import { SuccessCartridge } from 'components/Cartridge'
 import FiatDisplay from 'components/Display/FiatDisplay'
 import { Row, Title, Value } from 'components/Flyout'
@@ -160,7 +160,7 @@ export const FromToLogoLeft = ({
         <div>
           <Value data-e2e={`swap${inOrOut}Wallet`}>{children}</Value>
           <Title>
-            <Text size='14px' weight={500} color='grey600'>
+            <Text data-e2e={`swap${inOrOut}AccountType`} size='14px' weight={500} color='grey600'>
               {label}
             </Text>
           </Title>

@@ -8,6 +8,7 @@ import { ADDRESS_TYPES } from 'blockchain-wallet-v4/src/redux/payment/btc/utils'
 import { ExtractSuccess } from 'blockchain-wallet-v4/src/remote/types'
 import { createDeepEqualSelector } from 'blockchain-wallet-v4/src/utils'
 import { generateTradingAccount } from 'data/coins/utils'
+import { SwapAccountType } from 'data/components/types'
 
 import { getTradingBalance } from '..'
 
@@ -38,7 +39,7 @@ export const getAccounts = createDeepEqualSelector(
       sbBalance: ExtractSuccess<typeof sbBalanceR>
     ) => {
       const { coin } = ownProps
-      let accounts = []
+      let accounts: SwapAccountType[] = []
       // add non-custodial accounts if requested
       if (ownProps?.nonCustodialAccounts) {
         accounts = accounts.concat(
@@ -47,13 +48,10 @@ export const getAccounts = createDeepEqualSelector(
               const index = prop('index', acc)
               // this is using hdAccount with new segwit structure
               // need to get legacy xPub from derivations object similar to btc selector
-              // TODO: SEGWIT remove w/ DEPRECATED_V3
-              const xpub = acc.derivations
-                ? prop(
-                    'xpub',
-                    prop('derivations', acc).find((derr) => derr.type === 'legacy')
-                  )
-                : acc.xpub
+              const xpub = prop(
+                'xpub',
+                prop('derivations', acc).find((derr) => derr.type === 'legacy')
+              )
               const data = prop(xpub, bchData)
               const metadata = bchMetadata[index]
               return {
@@ -87,10 +85,7 @@ export const getAccounts = createDeepEqualSelector(
 
       // add trading accounts if requested
       if (ownProps?.tradingAccounts) {
-        accounts = accounts.concat(
-          // @ts-ignore
-          generateTradingAccount(coin, sbBalance as SBBalanceType)
-        )
+        accounts = accounts.concat(generateTradingAccount(coin, sbBalance as SBBalanceType))
       }
 
       return accounts

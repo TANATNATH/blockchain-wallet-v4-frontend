@@ -11,7 +11,6 @@ import {
   InterestLimitsType,
   RatesType,
   RemoteDataType,
-  SupportedWalletCurrenciesType,
   WithdrawalMinimumType,
   WithdrawLimits
 } from 'blockchain-wallet-v4/src/types'
@@ -26,7 +25,7 @@ class WithdrawalFormContainer extends PureComponent<Props> {
   componentDidMount() {
     const { walletCurrency } = this.props
     this.handleRefresh()
-    this.props.interestActions.fetchEddWithdrawLimits(walletCurrency)
+    this.props.interestActions.fetchEDDWithdrawLimits({ currency: walletCurrency })
   }
 
   handleDisplayToggle = (isCoin: boolean) => {
@@ -35,12 +34,12 @@ class WithdrawalFormContainer extends PureComponent<Props> {
     } as SuccessStateType)
     if (isCoin === displayCoin) return
     this.props.formActions.clearFields('interestWithdrawalForm', false, false, 'withdrawalAmount')
-    this.props.interestActions.setCoinDisplay(isCoin)
+    this.props.interestActions.setCoinDisplay({ isAmountDisplayedInCrypto: isCoin })
   }
 
   handleRefresh = () => {
     const { coin, interestActions, walletCurrency } = this.props
-    interestActions.initializeWithdrawalForm(coin, walletCurrency)
+    interestActions.initializeWithdrawalForm({ coin, walletCurrency })
   }
 
   render() {
@@ -76,7 +75,6 @@ export type SuccessStateType = {
   interestEDDWithdrawLimits: WithdrawLimits
   interestLimits: InterestLimitsType
   rates: RatesType
-  supportedCoins: SupportedWalletCurrenciesType
   withdrawalMinimums: WithdrawalMinimumType
 }
 

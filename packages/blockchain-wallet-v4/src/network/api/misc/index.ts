@@ -1,10 +1,16 @@
 import { Moment } from 'moment'
 
-import { CoinType, FiatType } from 'core/types'
+import { CoinfigType, CoinType, FiatType } from 'core/types'
 
 import { PriceIndexResponseType } from './types'
 
 export default ({ apiUrl, get, post }) => {
+  const getAssets = (): { currencies: CoinfigType[] } =>
+    get({
+      endPoint: '/assets/currencies/custodial',
+      url: apiUrl
+    })
+
   const getPriceIndex = (base: CoinType, quote: FiatType, time: Moment): PriceIndexResponseType =>
     get({
       data: { base, quote, time: time.unix() },
@@ -35,10 +41,26 @@ export default ({ apiUrl, get, post }) => {
       url: apiUrl
     })
 
+  const triggerWalletMagicLink = (email, captchaToken, sessionToken) => {
+    post({
+      contentType: 'application/json',
+      data: {
+        captcha: captchaToken,
+        email,
+        product: 'wallet',
+        siteKey: window.CAPTCHA_KEY
+      },
+      endPoint: '/auth/email-reminder',
+      sessionToken,
+      url: apiUrl
+    })
+  }
   return {
+    getAssets,
     getPriceIndex,
     getPriceIndexSeries,
     getPriceTimestampSeries,
-    getRandomBytes
+    getRandomBytes,
+    triggerWalletMagicLink
   }
 }

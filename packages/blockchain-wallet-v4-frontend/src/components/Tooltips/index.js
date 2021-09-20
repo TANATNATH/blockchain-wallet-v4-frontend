@@ -140,10 +140,7 @@ class Tooltips extends React.PureComponent {
           />
         </Tooltip>
         <Tooltip id='exchange.changeinput' place='bottom'>
-          <FormattedMessage
-            id='scenes.exchange.changeinput'
-            defaultMessage='Change Input'
-          />
+          <FormattedMessage id='scenes.exchange.changeinput' defaultMessage='Change Input' />
         </Tooltip>
         <Tooltip id='activityFeedWatchOnly'>
           <FormattedMessage
@@ -250,42 +247,10 @@ class Tooltips extends React.PureComponent {
             </Link>
           </TextGroup>
         </Tooltip>
-        <Tooltip
-          id='exchangeSideNavConnected'
-          bgColor='grey800'
-          padding='13px 20px'
-          opacity='1'
-        >
+        <Tooltip id='exchangeSideNavConnected' bgColor='grey800' padding='13px 20px' opacity='1'>
           <Text color='green400' weight={700} uppercase size='12px'>
-            <FormattedMessage
-              id='exchange-side-nav-tooltip-connected'
-              defaultMessage='connected'
-            />
+            <FormattedMessage id='exchange-side-nav-tooltip-connected' defaultMessage='connected' />
           </Text>
-        </Tooltip>
-        <Tooltip id='borrow.amount.tooltip'>
-          <FormattedMessage
-            id='borrow.amount.tooltip.description'
-            defaultMessage='This amount does not include the required collateral network fee.'
-          />
-        </Tooltip>
-        <Tooltip id='borrow.interest.tooltip'>
-          <FormattedMessage
-            id='borrow.interest.tooltip.description'
-            defaultMessage='Interest will be taken from the collateral deposited on a monthly basis.'
-          />
-        </Tooltip>
-        <Tooltip id='borrow.collateral.tooltip'>
-          <FormattedMessage
-            id='borrow.collateral.tooltip.description'
-            defaultMessage='The amount you need to deposit to open this loan.'
-          />
-        </Tooltip>
-        <Tooltip id='borrow.collateralpending.tooltip'>
-          <FormattedMessage
-            id='borrow.collateralpending.tooltip.description'
-            defaultMessage='The collateral deposit is pending until it is confirmed by the network and a Blockchain.com agent.'
-          />
         </Tooltip>
         <Tooltip id='transaction.pending.eth'>
           <FormattedMessage
@@ -294,10 +259,7 @@ class Tooltips extends React.PureComponent {
           />
         </Tooltip>
         <Tooltip id='coming-soon'>
-          <FormattedMessage
-            id='tooltip.comingsoon'
-            defaultMessage='Coming soon.'
-          />
+          <FormattedMessage id='tooltip.comingsoon' defaultMessage='Coming soon.' />
         </Tooltip>
         <Tooltip id='earninterest.calculation.tooltip'>
           <FormattedMessage
@@ -336,9 +298,12 @@ class Tooltips extends React.PureComponent {
           />
         </Tooltip>
         <Tooltip id='copy.on_chain_txs' maxWidth='250px'>
+          <FormattedMessage id='copy.on_chain_txs' defaultMessage='On-chain transactions only' />
+        </Tooltip>
+        <Tooltip id='tooltip.rates_error' maxWidth='160px'>
           <FormattedMessage
-            id='copy.on_chain_txs'
-            defaultMessage='On-chain transactions only'
+            id='copy.rates_error'
+            defaultMessage='Your crypto is safe, but pricing data is currently unavailable.'
           />
         </Tooltip>
       </TooltipWrapper>

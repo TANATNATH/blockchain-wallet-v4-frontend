@@ -1,9 +1,5 @@
 import { FiatType } from 'core/types'
 
-export type SwapEligibilityResponseType = {
-  eligible: boolean
-}
-
 export type SwapOrderType = {
   createdAt: string
   fiatCurrency: FiatType
@@ -44,11 +40,7 @@ export type ProcessedSwapOrderType = SwapOrderType & {
   insertedAt: string
 }
 
-export type SwapOrderDirectionType =
-  | 'INTERNAL'
-  | 'ON_CHAIN'
-  | 'FROM_USERKEY'
-  | 'TO_USERKEY'
+export type SwapOrderDirectionType = 'INTERNAL' | 'ON_CHAIN' | 'FROM_USERKEY' | 'TO_USERKEY'
 
 export type SwapOrderStateType =
   | 'PENDING_EXECUTION'
@@ -73,8 +65,10 @@ export type SwapUserLimitsType = {
     limit: string
     used: string
   }
+  max: string
   maxOrder: string
   maxPossibleOrder: string
+  min: string
   minOrder: string
   weekly: {
     available: string

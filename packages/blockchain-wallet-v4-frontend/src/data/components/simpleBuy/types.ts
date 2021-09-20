@@ -22,6 +22,7 @@ import {
   SwapQuoteType,
   SwapUserLimitsType
 } from 'blockchain-wallet-v4/src/types'
+import { RecurringBuyPeriods } from 'data/types'
 
 import { CountryType } from '../identityVerification/types'
 import { SwapAccountType, SwapBaseCounterTypes } from '../swap/types'
@@ -58,6 +59,7 @@ export type SBCheckoutFormValuesType =
       cryptoAmount: string
       fix: SBFixType
       orderType: SBOrderActionType
+      period?: RecurringBuyPeriods
     }
 export type SBCurrencySelectFormType = {
   search: string
@@ -82,6 +84,7 @@ export enum SimpleBuyStepType {
   'SELL_ORDER_SUMMARY',
   'TRANSFER_DETAILS',
   'UPGRADE_TO_GOLD',
+  'FREQUENCY',
   'VERIFY_EMAIL'
 }
 export type SBShowModalOriginType =
@@ -89,6 +92,7 @@ export type SBShowModalOriginType =
   | 'PendingOrder'
   | 'PriceChart'
   | 'InterestPage'
+  | 'RecurringBuyPromo'
   | 'SellEmpty'
   | 'SettingsGeneral'
   | 'SettingsProfile'
@@ -99,6 +103,7 @@ export type SBShowModalOriginType =
   | 'WithdrawModal'
   | 'SwapNoHoldings'
   | 'CurrencyList'
+  | 'Goals'
 
 export enum SBCardStateEnum {
   PENDING,
@@ -428,12 +433,23 @@ export type StepActionsPayload =
       step: 'PREVIEW_SELL'
     }
   | {
-      step: 'ADD_CARD' | 'CC_BILLING_ADDRESS' | 'KYC_REQUIRED' | 'UPGRADE_TO_GOLD' | 'LOADING'
+      step:
+        | 'ADD_CARD'
+        | 'CC_BILLING_ADDRESS'
+        | 'KYC_REQUIRED'
+        | 'UPGRADE_TO_GOLD'
+        | 'LOADING'
+        | 'FREQUENCY'
     }
 
 interface SetStepAction {
   payload: StepActionsPayload
   type: typeof AT.SET_STEP
+}
+
+interface SetMethodAction {
+  payload: SBPaymentMethodType
+  type: typeof AT.SET_METHOD
 }
 
 interface SetFiatCurrencyAction {
@@ -542,6 +558,7 @@ export type SimpleBuyActionTypes =
   | InitializeCheckout
   | SetFiatCurrencyAction
   | SetStepAction
+  | SetMethodAction
   | ShowModalAction
   | UpdatePaymentFailureAction
   | UpdatePaymentLoadingAction
